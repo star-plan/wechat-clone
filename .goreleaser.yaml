@@ -1,0 +1,33 @@
+version: 2
+
+builds:
+  - main: .
+    binary: wechat-clone
+    goos:
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+brews:
+  - repository:
+      owner: star-plan
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    homepage: "https://github.com/star-plan/wechat-clone"
+    description: "macOS 微信分身管理 CLI 工具"
+    license: "Apache-2.0"
