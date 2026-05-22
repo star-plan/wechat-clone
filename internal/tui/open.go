@@ -3,7 +3,6 @@ package tui
 import (
 	"fmt"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/deali/wechat-clone/internal/app"
@@ -14,8 +13,7 @@ type openState int
 
 const (
 	openStateSelect openState = iota
-	openStateWorking
-	openStateDone
+	openStateGuide
 )
 
 type openLoadedMsg struct {
@@ -23,31 +21,25 @@ type openLoadedMsg struct {
 	err    error
 }
 
-type openDoneMsg struct {
+type openRevealMsg struct {
 	err error
 }
 
 type OpenModel struct {
-	app     *app.App
-	state   openState
-	clones  []macos.CloneInfo
-	cursor  int
-	all     bool
-	spinner spinner.Model
-	err     error
-	done    bool
+	app    *app.App
+	state  openState
+	clones []macos.CloneInfo
+	cursor int
+	all    bool
+	err    error
+	done   bool
 }
 
 func NewOpenModel(a *app.App) *OpenModel {
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(primary)
-
 	return &OpenModel{
-		app:     a,
-		state:   openStateSelect,
-		all:     true,
-		spinner: s,
+		app:   a,
+		state: openStateSelect,
+		all:   true,
 	}
 }
 
@@ -79,12 +71,22 @@ func (m *OpenModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "a":
 				m.all = !m.all
 			case "enter":
-				m.state = openStateWorking
-				return m, tea.Batch(m.spinner.Tick, m.doOpen())
+				m.state = openStateGuide
+				return m, nil
 			}
-		case openStateDone:
+		case openStateGuide:
 			switch msg.String() {
-			case "enter":
+			case "r":
+				// Reveal selected/all in Finder
+				if m.all {
+					for _, c := range m.clones {
+						macos.RevealInFinder(c.Path)
+					}
+				} else if len(m.clones) > 0 {
+					macos.RevealInFinder(m.clones[m.cursor].Path)
+				}
+				return m, nil
+			case "enter", "esc":
 				m.done = true
 				return m, nil
 			}
@@ -93,37 +95,14 @@ func (m *OpenModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case openLoadedMsg:
 		m.clones = msg.clones
 		m.err = msg.err
-
-	case openDoneMsg:
-		m.err = msg.err
-		m.state = openStateDone
-		return m, nil
-
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
 	}
 	return m, nil
-}
-
-func (m *OpenModel) doOpen() tea.Cmd {
-	return func() tea.Msg {
-		if m.all {
-			return openDoneMsg{err: m.app.OpenClones()}
-		}
-		if len(m.clones) == 0 {
-			return openDoneMsg{err: fmt.Errorf("没有找到任何分身")}
-		}
-		id := m.clones[m.cursor].ID
-		return openDoneMsg{err: m.app.OpenClones(id)}
-	}
 }
 
 func (m *OpenModel) View() string {
 	title := titleStyle.Render("启动微信分身")
 
-	if m.err != nil && m.state != openStateDone {
+	if m.err != nil {
 		return lipgloss.JoinVertical(lipgloss.Left,
 			title,
 			"",
@@ -146,14 +125,12 @@ func (m *OpenModel) View() string {
 		}
 
 		items := ""
-		// "All" option
 		cursor := "  "
 		if m.all {
 			cursor = "▸ "
 		}
-		items += menuItemActiveStyle.Render(cursor+"打开所有分身") + "\n"
+		items += menuItemActiveStyle.Render(cursor+"查看所有分身") + "\n"
 
-		// Individual clones
 		for i, c := range m.clones {
 			cursor := "  "
 			if !m.all && m.cursor == i {
@@ -169,28 +146,30 @@ func (m *OpenModel) View() string {
 		return lipgloss.JoinVertical(lipgloss.Left,
 			title,
 			"",
-			"选择要启动的分身:",
+			"选择要查看的分身:",
 			"",
 			items,
 			"",
 			statusStyle.Render("↑/↓ 选择  •  a 切换全部  •  Enter 确认  •  Esc 返回"),
 		)
 
-	case openStateWorking:
-		return lipgloss.JoinVertical(lipgloss.Left,
-			title,
-			"",
-			lipgloss.JoinHorizontal(lipgloss.Center, m.spinner.View(), " 正在启动..."),
-		)
-
-	case openStateDone:
+	case openStateGuide:
 		content := title + "\n\n"
-		if m.err != nil {
-			content += errorStyle.Render(fmt.Sprintf("错误: %v", m.err))
-		} else {
-			content += successStyle.Render("启动成功!")
+		content += "请在 Finder 或启动台中手动打开以下微信分身:\n\n"
+
+		if m.all {
+			for _, c := range m.clones {
+				content += "  " + lipgloss.NewStyle().Foreground(primary).Render(c.Name) + "\n"
+				content += "  " + infoStyle.Render(c.Path) + "\n\n"
+			}
+		} else if len(m.clones) > 0 {
+			c := m.clones[m.cursor]
+			content += "  " + lipgloss.NewStyle().Foreground(primary).Render(c.Name) + "\n"
+			content += "  " + infoStyle.Render(c.Path) + "\n\n"
 		}
-		content += "\n\n" + statusStyle.Render("按 Enter 返回主菜单")
+
+		content += infoStyle.Render("提示: 双击 .app 即可启动，也可以拖到程序坞固定") + "\n\n"
+		content += statusStyle.Render("r 在 Finder 中定位  •  Enter 返回主菜单")
 		return content
 	}
 

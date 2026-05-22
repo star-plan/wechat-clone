@@ -6,42 +6,34 @@ import (
 	"github.com/deali/wechat-clone/internal/macos"
 )
 
-// OpenClones starts the specified clones. If no IDs are given, all clones are started.
-func (a *App) OpenClones(ids ...int) error {
+// OpenGuide returns the paths of clones for manual launching guidance.
+// If no IDs are given, all clones are returned.
+func (a *App) OpenGuide(ids ...int) ([]macos.CloneInfo, error) {
 	clones, err := a.ListClones()
 	if err != nil {
-		return fmt.Errorf("获取分身列表失败: %w", err)
+		return nil, fmt.Errorf("获取分身列表失败: %w", err)
 	}
 	if len(clones) == 0 {
-		return fmt.Errorf("没有找到任何分身，请先使用 create 命令创建")
+		return nil, fmt.Errorf("没有找到任何分身，请先使用 create 命令创建")
 	}
 
-	// If no specific IDs, open all
 	if len(ids) == 0 {
-		for _, c := range clones {
-			if err := macos.LaunchApp(c.Path); err != nil {
-				return fmt.Errorf("启动 %s 失败: %w", c.Name, err)
-			}
-		}
-		return nil
+		return clones, nil
 	}
 
-	// Open specific clones
+	var result []macos.CloneInfo
 	for _, id := range ids {
 		found := false
 		for _, c := range clones {
 			if c.ID == id {
-				if err := macos.LaunchApp(c.Path); err != nil {
-					return fmt.Errorf("启动 %s 失败: %w", c.Name, err)
-				}
+				result = append(result, c)
 				found = true
 				break
 			}
 		}
 		if !found {
-			return fmt.Errorf("未找到编号为 %d 的分身", id)
+			return nil, fmt.Errorf("未找到编号为 %d 的分身", id)
 		}
 	}
-
-	return nil
+	return result, nil
 }

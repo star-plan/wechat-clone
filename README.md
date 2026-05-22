@@ -80,10 +80,10 @@ wechat-clone create 3 --force
 # 列出所有分身
 wechat-clone list
 
-# 打开所有分身
+# 查看分身启动指引（显示路径，可选在 Finder 中定位）
 wechat-clone open
 
-# 打开指定编号的分身
+# 查看指定编号分身的启动指引
 wechat-clone open 2
 
 # 修复所有分身签名
@@ -131,6 +131,10 @@ wechat-clone repair
 ### Q: 分身之间数据会互相影响吗？
 
 不会。每个分身有独立的 Bundle ID，微信会为每个分身创建独立的数据目录。
+
+### Q: 怎么打开微信分身？
+
+创建分身后，在 Finder 或启动台中找到 `WeChat Clone 1.app`，双击即可启动。也可以运行 `wechat-clone open` 查看路径并快速在 Finder 中定位。建议把常用的分身拖到程序坞固定。
 
 ### Q: 可以同时登录多个微信账号吗？
 
